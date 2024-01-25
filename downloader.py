@@ -5,13 +5,14 @@ https://core-sat.maps.yandex.net/tiles?l=sat&x=2460&y=1362&z=12
 import sqlite3
 from sqlite3 import Error
 
-import requests
+import asyncio
+import aiohttp
 
 conn = None
 
 
 def create_table(conn, zoom):
-    create_table_sql = f"""CREATE TABLE z{zoom} (
+    create_table_sql = f"""CREATE TABLE if not exists z{zoom} (
         x     INTEGER NOT NULL,
         y     INTEGER NOT NULL,
         image BLOB    NOT NULL,
@@ -29,13 +30,13 @@ def create_table(conn, zoom):
         print(e)
 
 
-def save_in_db(x, y, zoom, data):
+def save_in_db(x, y, zoom, data, percent):
     task_1 = (x, y, data, 'png')
     sql = f'INSERT OR IGNORE INTO z{zoom}(x,y,image, ext) VALUES(?,?,?,?)'
     cur = conn.cursor()
     cur.execute(sql, task_1)
     conn.commit()
-    print("Saved")
+    print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y} ")
 
 
 def is_tile_exsists(x, y, zoom):
@@ -46,36 +47,59 @@ def is_tile_exsists(x, y, zoom):
     return rows[0][0] == 1
 
 
-def download(zoom):
+async def download_tile(x, y, zoom, percent):
+    # print(f"Downloading [{zoom}]:{x}x{y}  [{percent}%]")
+    url = f"https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={zoom}"
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            content = await resp.read()
+
+            try:
+                save_in_db(x, y, zoom, content, percent)
+            except Error as e:
+                print(e)
+
+
+async def download_bucket(buckets):
+    await asyncio.gather(*[download_tile(*bucket) for bucket in buckets])
+
+
+async def download(zoom):
     max_size = 2 ** zoom
     current = 0
     total = max_size * max_size
+
+    bucket = []
+
     for x in range(max_size):
         for y in range(max_size):
+            current += 1
+
             if is_tile_exsists(x, y, zoom):
                 continue
 
             percent = current / total * 100.0
-            print(f"Downloading [{zoom}]:{x}x{y}  [{percent}%]")
-            URL = f"https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={zoom}"
+            bucket.append((x, y, zoom, percent))
 
-            try:
-                response = requests.get(URL)
-                save_in_db(x, y, zoom, response.content)
-            except Error as e:
-                print(e)
+            if len(bucket) > 10:
+                await download_bucket(bucket)
+                bucket.clear()
 
-            current += 1
+    await download_bucket(bucket)
 
 
 if __name__ == "__main__":
     db_file = "World.db3"
 
-    zoom = 4
+    zoom = 7
 
     try:
         conn = sqlite3.connect(db_file)
         create_table(conn, zoom)
-        download(zoom)
+
+        asyncio.run(download(zoom))
     except Error as e:
         print(e)
+
+    print("Finished")
