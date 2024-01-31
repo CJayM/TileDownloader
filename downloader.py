@@ -1,4 +1,5 @@
 import sqlite3
+import time
 from sqlite3 import Error
 
 import asyncio
@@ -103,10 +104,9 @@ async def download_tile(x, y, zoom, percent):
             async with session.get(url) as resp:
                 content = await resp.read()
 
-            try:
-                await save_in_db(x, y, zoom, content)
-                await save_in_pickle(x, y, zoom)
-                    print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y} ")
+                try:
+                    await save_in_db(x, y, zoom, content)
+                    await save_in_pickle(x, y, zoom)
                 except Error as e:
                     print(e)
         except aiohttp.client_exceptions.ClientConnectorError as conn_error:
@@ -114,8 +114,31 @@ async def download_tile(x, y, zoom, percent):
             await asyncio.sleep(30)
 
 
+def get_index(x, y, zoom):
+    max_size = 2 ** zoom
+    return y * max_size + x
+
+
+start_time = time.time()
+
+
 async def download_bucket(buckets):
+
     await asyncio.gather(*[download_tile(*bucket) for bucket in buckets])
+
+    if not buckets:
+        return
+
+    global start_time
+    buckets.sort(key=lambda bucket: get_index(bucket[0], bucket[1], bucket[2]))
+    x, y, zoom, percent = buckets[-1]
+    now = time.time()
+    total = now - start_time
+    speed = total / len(buckets)
+    if speed != 0:
+        speed = 1.0 / speed
+    print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y}  count:{len(buckets)}  TPS:{speed:.0f}")
+    start_time = time.time()
 
 
 async def download_zoom(zoom):
@@ -136,7 +159,7 @@ async def download_zoom(zoom):
             percent = current / total * 100.0
             bucket.append((x, y, zoom, percent))
 
-            if len(bucket) > 10:
+            if len(bucket) > 9:
                 await download_bucket(bucket)
                 bucket.clear()
 
