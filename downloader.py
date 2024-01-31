@@ -99,15 +99,19 @@ async def download_tile(x, y, zoom, percent):
     url = f"https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={zoom}"
 
     async with aiohttp.ClientSession() as session:
-        async with session.get(url) as resp:
-            content = await resp.read()
+        try:
+            async with session.get(url) as resp:
+                content = await resp.read()
 
             try:
                 await save_in_db(x, y, zoom, content)
                 await save_in_pickle(x, y, zoom)
-                print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y} ")
-            except Error as e:
-                print(e)
+                    print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y} ")
+                except Error as e:
+                    print(e)
+        except aiohttp.client_exceptions.ClientConnectorError as conn_error:
+            print(".", end=" ")
+            await asyncio.sleep(30)
 
 
 async def download_bucket(buckets):
