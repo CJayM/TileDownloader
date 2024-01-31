@@ -114,7 +114,7 @@ async def download_bucket(buckets):
     await asyncio.gather(*[download_tile(*bucket) for bucket in buckets])
 
 
-async def download(zoom):
+async def download_zoom(zoom):
     max_size = 2 ** zoom
     current = 0
     total = max_size * max_size
@@ -150,7 +150,7 @@ if __name__ == "__main__":
             create_table(conn, SETTINGS.current_zoom)
 
             print("Download at ZOOM", SETTINGS.current_zoom)
-            asyncio.run(download(SETTINGS.current_zoom))
+            asyncio.run(download_zoom(SETTINGS.current_zoom))
         except Error as e:
             print(e)
 
