@@ -46,7 +46,7 @@ def create_table(conn, zoom):
         print(e)
 
 
-async def save_in_db(x, y, zoom, data, percent):
+async def save_in_db(x, y, zoom, data):
     task_1 = (x, y, data, 'png')
     sql = f'INSERT OR IGNORE INTO z{zoom}(x,y,image, ext) VALUES(?,?,?,?)'
 
@@ -103,7 +103,7 @@ async def download_tile(x, y, zoom, percent):
             content = await resp.read()
 
             try:
-                await save_in_db(x, y, zoom, content, percent)
+                await save_in_db(x, y, zoom, content)
                 await save_in_pickle(x, y, zoom)
                 print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y} ")
             except Error as e:
@@ -126,7 +126,7 @@ async def download_zoom(zoom):
             current += 1
 
             if is_tile_exists(x, y, zoom):
-                save_in_pickle(x, y, zoom)
+                await save_in_pickle(x, y, zoom)
                 continue
 
             percent = current / total * 100.0
