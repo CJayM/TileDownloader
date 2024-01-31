@@ -87,7 +87,7 @@ async def save_in_pickle(x, y, zoom):
             pickle.dump(SETTINGS, file)
 
 
-def is_tile_exsists(x, y, zoom):
+def is_tile_exists(x, y, zoom):
     sql = f"SELECT EXISTS(SELECT 1 FROM z{zoom} WHERE x=\"{x}\" and y=\"{y}\" LIMIT 1);"
     c = conn.cursor()
     c.execute(sql)
@@ -125,7 +125,7 @@ async def download_zoom(zoom):
         for y in range(max_size):
             current += 1
 
-            if is_tile_exsists(x, y, zoom):
+            if is_tile_exists(x, y, zoom):
                 save_in_pickle(x, y, zoom)
                 continue
 
