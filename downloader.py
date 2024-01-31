@@ -150,7 +150,9 @@ if __name__ == "__main__":
 
     while SETTINGS.current_zoom <= MAX_ZOOM:
         try:
-            conn = sqlite3.connect(DB_FILE)
+            conn = sqlite3.connect(DB_FILE, isolation_level=None)
+            conn.execute('pragma journal_mode=wal')
+
             create_table(conn, SETTINGS.current_zoom)
 
             print("Download at ZOOM", SETTINGS.current_zoom)
