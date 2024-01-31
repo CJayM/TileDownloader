@@ -12,6 +12,8 @@ DB_FILE = "tiles.db3"
 pickle_lock = asyncio.Lock()
 db_lock = asyncio.Lock()
 
+MAX_ZOOM = 12
+
 
 class Settings:
     FILE_NAME = "settings.pickle"
@@ -142,12 +144,14 @@ if __name__ == "__main__":
         with open(Settings.FILE_NAME, 'rb') as file:
             SETTINGS = pickle.load(file)
 
-    try:
-        conn = sqlite3.connect(DB_FILE)
-        create_table(conn, SETTINGS.current_zoom)
+    while SETTINGS.current_zoom <= MAX_ZOOM:
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            create_table(conn, SETTINGS.current_zoom)
 
-        asyncio.run(download(SETTINGS.current_zoom))
-    except Error as e:
-        print(e)
+            print("Download at ZOOM", SETTINGS.current_zoom)
+            asyncio.run(download(SETTINGS.current_zoom))
+        except Error as e:
+            print(e)
 
     print("Finished")
