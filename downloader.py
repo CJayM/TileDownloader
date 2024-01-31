@@ -1,7 +1,3 @@
-"""
-https://core-sat.maps.yandex.net/tiles?l=sat&v=3.1142.0&x=2460&y=1362&z=12&scale=1.25&lang=ru_RU&client_id=yandex-web-maps
-https://core-sat.maps.yandex.net/tiles?l=sat&x=2460&y=1362&z=12
-"""
 import sqlite3
 from sqlite3 import Error
 
@@ -48,7 +44,6 @@ def is_tile_exsists(x, y, zoom):
 
 
 async def download_tile(x, y, zoom, percent):
-    # print(f"Downloading [{zoom}]:{x}x{y}  [{percent}%]")
     url = f"https://core-sat.maps.yandex.net/tiles?l=sat&x={x}&y={y}&z={zoom}"
 
     async with aiohttp.ClientSession() as session:
