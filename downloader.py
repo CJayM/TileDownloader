@@ -97,8 +97,6 @@ async def save_in_pickle(x, y, zoom):
                 del buffered[0]
                 SETTINGS.buffered_cells = set(buffered)
 
-
-
         global last_save
         delta = time.time() - last_save
         if delta > 60:
@@ -187,10 +185,13 @@ def find_start(zoom):
     for y in range(max_size):
         for x in range(max_size):
             current += 1
-
+            index = get_index(x, y, zoom)
             if is_tile_exists(x, y, zoom) == False:
-                SETTINGS.current_cell = get_index(x, y, zoom)
+                SETTINGS.current_cell = index
                 break
+            
+            sys.stdout.write("\033[F")
+            print("Index:", index)
 
 
 if __name__ == "__main__":
@@ -210,9 +211,9 @@ if __name__ == "__main__":
             size = 2 ** SETTINGS.current_zoom
             max_index = size * size - 1
             if SETTINGS.current_cell != max_index:
-                    print("Download at ZOOM", SETTINGS.current_zoom)
-                    print("")
-                    asyncio.run(download_zoom(SETTINGS.current_zoom))
+                print("Download at ZOOM", SETTINGS.current_zoom)
+                print("")
+                asyncio.run(download_zoom(SETTINGS.current_zoom))
             else:
                 SETTINGS.current_cell = -1
                 SETTINGS.current_zoom += 1
