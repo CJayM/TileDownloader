@@ -6,6 +6,7 @@ import asyncio
 import aiohttp
 import pickle
 import os
+import sys
 
 conn = None
 
@@ -56,13 +57,17 @@ async def save_in_db(x, y, zoom, data):
         cur.execute(sql, task_1)
         conn.commit()
 
+
 last_save = time.time()
+
+
 def save_state():
-    global  last_save
+    global last_save
 
     with open(Settings.FILE_NAME, 'wb') as file:
         pickle.dump(SETTINGS, file)
     last_save = time.time()
+
 
 async def save_in_pickle(x, y, zoom):
     if zoom < SETTINGS.current_zoom:
@@ -95,6 +100,9 @@ async def save_in_pickle(x, y, zoom):
         delta = time.time() - last_save
         if delta > 60:
             save_state()
+        else:
+            sys.stdout.write("\033[F")
+            print("Index:", index)
 
 
 def is_tile_exists(x, y, zoom):
@@ -132,7 +140,6 @@ start_time = time.time()
 
 
 async def download_bucket(buckets):
-
     await asyncio.gather(*[download_tile(*bucket) for bucket in buckets])
 
     if not buckets:
