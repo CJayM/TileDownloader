@@ -1,20 +1,20 @@
-import sqlite3
 import time
-from sqlite3 import Error
 
 import asyncio
 import aiohttp
 import pickle
 import os
 import sys
+from sqlite3 import Error
+
+import db
 
 conn = None
 
-DB_FILE = "tiles.db3"
 pickle_lock = asyncio.Lock()
-db_lock = asyncio.Lock()
 
-MAX_ZOOM = 12
+MAX_ZOOM = 14
+THREAD_COUNTS = 20
 
 
 class Settings:
@@ -28,36 +28,6 @@ class Settings:
 
 SETTINGS = Settings()
 
-
-def create_table(conn, zoom):
-    create_table_sql = f"""CREATE TABLE if not exists z{zoom} (
-        x     INTEGER NOT NULL,
-        y     INTEGER NOT NULL,
-        image BLOB    NOT NULL,
-        ext   TEXT    NOT NULL,
-        PRIMARY KEY (
-            x,
-            y
-        )
-    );
-    """
-    try:
-        c = conn.cursor()
-        c.execute(create_table_sql)
-    except Error as e:
-        print(e)
-
-
-async def save_in_db(x, y, zoom, data):
-    task_1 = (x, y, data, 'png')
-    sql = f'INSERT OR IGNORE INTO z{zoom}(x,y,image, ext) VALUES(?,?,?,?)'
-
-    async with db_lock:
-        cur = conn.cursor()
-        cur.execute(sql, task_1)
-        conn.commit()
-
-
 last_save = time.time()
 
 
@@ -67,6 +37,7 @@ def save_state():
     with open(Settings.FILE_NAME, 'wb') as file:
         pickle.dump(SETTINGS, file)
     last_save = time.time()
+    print("\t\tState saved")
 
 
 def get_index(x, y, zoom):
@@ -102,16 +73,9 @@ async def save_in_pickle(x, y, zoom):
         if delta > 60:
             save_state()
         else:
-            sys.stdout.write("\033[F")
-            print("Index:", index)
-
-
-def is_tile_exists(x, y, zoom):
-    sql = f"SELECT EXISTS(SELECT 1 FROM z{zoom} WHERE x=\"{x}\" and y=\"{y}\" LIMIT 1);"
-    c = conn.cursor()
-    c.execute(sql)
-    rows = c.fetchall()
-    return rows[0][0] == 1
+            pass
+            # sys.stdout.write("\033[F")
+            # print("Index:", index)
 
 
 async def download_tile(x, y, zoom, percent):
@@ -123,16 +87,27 @@ async def download_tile(x, y, zoom, percent):
                 content = await resp.read()
 
                 try:
-                    await save_in_db(x, y, zoom, content)
+                    await db.save_in_db(conn,x, y, zoom, content)
                     await save_in_pickle(x, y, zoom)
                 except Error as e:
                     print(e)
         except aiohttp.client_exceptions.ClientConnectorError as conn_error:
             print(".", end=" ")
             await asyncio.sleep(30)
+        except aiohttp.client_exceptions.ClientOSError as err:
+            print("Превышен таймаут семафора")
+            await asyncio.sleep(30)
 
 
 start_time = time.time()
+
+MINUTE = 60 * 60
+HOUR = 60 * MINUTE
+DAY = HOUR * 24
+
+
+def humanized_time(secs):
+    return f"{secs:.2f} sec."
 
 
 async def download_bucket(buckets):
@@ -149,7 +124,12 @@ async def download_bucket(buckets):
     speed = total / len(buckets)
     if speed != 0:
         speed = 1.0 / speed
-    print(f"[{percent:.2f}%]    Saved [{zoom}]:{x}x{y}  count:{len(buckets)}  TPS:{speed:.0f}")
+
+    total_count = (2 ** SETTINGS.current_zoom) ** 2
+    elapsed_count = total_count - SETTINGS.current_cell
+    elapsed_secs = elapsed_count / speed
+    elapsed_text = humanized_time(elapsed_secs)
+    print(f"[{percent:.2f}%]    Downloaded [{zoom}]:{x}x{y}  count:{len(buckets)}  TPS:{speed:.0f}  [{elapsed_text}]")
     start_time = time.time()
 
 
@@ -160,40 +140,51 @@ async def download_zoom(zoom):
 
     bucket = []
 
-    for y in range(max_size):
-        for x in range(max_size):
+    start_y = 0
+    start_x = 0
+    if SETTINGS.current_cell != -1:
+        start_y = SETTINGS.current_cell // max_size
+        start_x = SETTINGS.current_cell - start_y * max_size
+
+    for y in range(start_y, max_size):
+        for x in range(start_x, max_size):
             current += 1
 
-            if is_tile_exists(x, y, zoom):
+            if db.is_tile_exists(conn, x, y, zoom):
                 await save_in_pickle(x, y, zoom)
                 continue
 
             percent = current / total * 100.0
             bucket.append((x, y, zoom, percent))
 
-            if len(bucket) > 9:
+            if len(bucket) >= THREAD_COUNTS:
                 await download_bucket(bucket)
                 bucket.clear()
 
     await download_bucket(bucket)
 
 
-def find_start(zoom):
+def find_start(zoom, start_cell):
     max_size = 2 ** zoom
     current = 0
-    max_index = max_size * max_size - 1
+    total = max_size * max_size - 1
 
-    for y in range(max_size):
-        for x in range(max_size):
-            current += 1
-            index = get_index(x, y, zoom)
-            if is_tile_exists(x, y, zoom) == False:
-                SETTINGS.current_cell = index
+    start_y = 0
+    start_x = 0
+    if start_cell != -1:
+        start_y = start_cell // max_size
+        start_x = start_cell - start_y * max_size
+
+    for y in range(start_y, max_size):
+        for x in range(start_x, max_size):
+            current = get_index(x, y, zoom)
+            if db.is_tile_exists(conn, x, y, zoom) == False:
                 break
 
-            sys.stdout.write("\033[F")
-            percent = float(index) / max_index * 100.0
-            print(f"Index:{index}/{max_index} [{percent:.2f}]")
+            # percent = float(current) / total * 100.0
+            # print(f"checked {current}/{total}  [{percent:.2f}%] ")
+
+    return current
 
 
 if __name__ == "__main__":
@@ -203,20 +194,21 @@ if __name__ == "__main__":
 
     while SETTINGS.current_zoom <= MAX_ZOOM:
         try:
-            conn = sqlite3.connect(DB_FILE, isolation_level=None)
-            conn.execute('pragma journal_mode=wal')
-            create_table(conn, SETTINGS.current_zoom)
+            conn = db.make_connection()
+            db.create_table(conn, SETTINGS.current_zoom)
 
             print("Check ZOOM", SETTINGS.current_zoom)
             print("")
-            find_start(SETTINGS.current_zoom)
+            current = find_start(SETTINGS.current_zoom, SETTINGS.current_cell)
             size = 2 ** SETTINGS.current_zoom
             max_index = size * size - 1
-            if SETTINGS.current_cell != max_index:
+            if current != max_index:
+                SETTINGS.current_cell = current
                 print("Download at ZOOM", SETTINGS.current_zoom)
                 print("")
                 asyncio.run(download_zoom(SETTINGS.current_zoom))
-            else:
+
+            if current == max_index:
                 SETTINGS.current_cell = -1
                 SETTINGS.current_zoom += 1
 
