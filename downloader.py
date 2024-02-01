@@ -69,12 +69,17 @@ def save_state():
     last_save = time.time()
 
 
+def get_index(x, y, zoom):
+    max_size = 2 ** zoom
+    return y * max_size + x
+
+
 async def save_in_pickle(x, y, zoom):
     if zoom < SETTINGS.current_zoom:
         return
 
     size = 2 ** zoom
-    index = y * size + x
+    index = get_index(x, y, zoom)
 
     if index < SETTINGS.current_cell:
         return
@@ -92,9 +97,7 @@ async def save_in_pickle(x, y, zoom):
                 del buffered[0]
                 SETTINGS.buffered_cells = set(buffered)
 
-        if SETTINGS.current_cell + 1 == size * size:
-            SETTINGS.current_cell = -1
-            SETTINGS.current_zoom += 1
+
 
         global last_save
         delta = time.time() - last_save
@@ -131,11 +134,6 @@ async def download_tile(x, y, zoom, percent):
             await asyncio.sleep(30)
 
 
-def get_index(x, y, zoom):
-    max_size = 2 ** zoom
-    return y * max_size + x
-
-
 start_time = time.time()
 
 
@@ -164,8 +162,8 @@ async def download_zoom(zoom):
 
     bucket = []
 
-    for x in range(max_size):
-        for y in range(max_size):
+    for y in range(max_size):
+        for x in range(max_size):
             current += 1
 
             if is_tile_exists(x, y, zoom):
@@ -182,6 +180,19 @@ async def download_zoom(zoom):
     await download_bucket(bucket)
 
 
+def find_start(zoom):
+    max_size = 2 ** zoom
+    current = 0
+
+    for y in range(max_size):
+        for x in range(max_size):
+            current += 1
+
+            if is_tile_exists(x, y, zoom) == False:
+                SETTINGS.current_cell = get_index(x, y, zoom)
+                break
+
+
 if __name__ == "__main__":
     if os.path.exists(Settings.FILE_NAME):
         with open(Settings.FILE_NAME, 'rb') as file:
@@ -191,12 +202,19 @@ if __name__ == "__main__":
         try:
             conn = sqlite3.connect(DB_FILE, isolation_level=None)
             conn.execute('pragma journal_mode=wal')
-
             create_table(conn, SETTINGS.current_zoom)
 
-            print("Download at ZOOM", SETTINGS.current_zoom)
-            print("")
-            asyncio.run(download_zoom(SETTINGS.current_zoom))
+            find_start(SETTINGS.current_zoom)
+            size = 2 ** SETTINGS.current_zoom
+            max_index = size * size - 1
+            if SETTINGS.current_cell != max_index:
+                    print("Download at ZOOM", SETTINGS.current_zoom)
+                    print("")
+                    asyncio.run(download_zoom(SETTINGS.current_zoom))
+            else:
+                SETTINGS.current_cell = -1
+                SETTINGS.current_zoom += 1
+
             save_state()
         except Error as e:
             print(e)
