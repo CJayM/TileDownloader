@@ -195,6 +195,7 @@ if __name__ == "__main__":
             create_table(conn, SETTINGS.current_zoom)
 
             print("Download at ZOOM", SETTINGS.current_zoom)
+            print("")
             asyncio.run(download_zoom(SETTINGS.current_zoom))
             save_state()
         except Error as e:
