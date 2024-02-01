@@ -10,7 +10,7 @@ from sqlite3 import Error
 import utils
 import db
 
-conn = None
+repo = db.Repository()
 
 pickle_lock = asyncio.Lock()
 
@@ -83,7 +83,7 @@ async def download_tile(x, y, zoom, percent):
                 content = await resp.read()
 
                 try:
-                    await db.save_in_db(conn,x, y, zoom, content)
+                    await repo.save(x, y, zoom, content)
                     await save_in_pickle(x, y, zoom)
                 except Error as e:
                     print(e)
@@ -138,7 +138,7 @@ async def download_zoom(zoom):
         for x in range(start_x, max_size):
             current += 1
 
-            if db.is_tile_exists(conn, x, y, zoom):
+            if repo.is_exists(x, y, zoom):
                 await save_in_pickle(x, y, zoom)
                 continue
 
@@ -152,29 +152,6 @@ async def download_zoom(zoom):
     await download_bucket(bucket)
 
 
-def find_start(zoom, start_cell):
-    max_size = 2 ** zoom
-    current = 0
-    total = max_size * max_size - 1
-
-    start_y = 0
-    start_x = 0
-    if start_cell != -1:
-        start_y = start_cell // max_size
-        start_x = start_cell - start_y * max_size
-
-    for y in range(start_y, max_size):
-        for x in range(start_x, max_size):
-            current = utils.get_index(x, y, zoom)
-            if db.is_tile_exists(conn, x, y, zoom) == False:
-                break
-
-            # percent = float(current) / total * 100.0
-            # print(f"checked {current}/{total}  [{percent:.2f}%] ")
-
-    return current
-
-
 if __name__ == "__main__":
     if os.path.exists(Settings.FILE_NAME):
         with open(Settings.FILE_NAME, 'rb') as file:
@@ -182,12 +159,12 @@ if __name__ == "__main__":
 
     while SETTINGS.current_zoom <= MAX_ZOOM:
         try:
-            conn = db.make_connection()
-            db.create_table(conn, SETTINGS.current_zoom)
+            repo.open()
+            repo.create_table(SETTINGS.current_zoom)
 
             print("Check ZOOM", SETTINGS.current_zoom)
             print("")
-            current = find_start(SETTINGS.current_zoom, SETTINGS.current_cell)
+            current = repo.find_start(SETTINGS.current_zoom, SETTINGS.current_cell)
             size = 2 ** SETTINGS.current_zoom
             max_index = size * size - 1
             if current != max_index:
