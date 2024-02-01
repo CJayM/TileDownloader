@@ -41,7 +41,6 @@ async def save_in_db(conn, x, y, zoom, data):
     async with db_lock:
         cur = conn.cursor()
         cur.execute(sql, task_1)
-        conn.commit()
 
 
 def is_tile_exists(conn, x, y, zoom):
@@ -58,6 +57,10 @@ class Repository:
 
     def open(self):
         self.conn = make_connection()
+
+    async def commit(self):
+        async with db_lock:
+            self.conn.commit()
 
     def create_table(self, zoom):
         create_table(self.conn, zoom)

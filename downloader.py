@@ -15,7 +15,7 @@ repo = db.Repository()
 pickle_lock = asyncio.Lock()
 
 MAX_ZOOM = 14
-THREAD_COUNTS = 20
+THREAD_COUNTS = 40
 
 
 class Settings:
@@ -68,6 +68,7 @@ async def save_in_pickle(x, y, zoom):
         delta = time.time() - last_save
         if delta > 60:
             save_state()
+            await repo.commit()
         else:
             pass
             # sys.stdout.write("\033[F")
@@ -178,6 +179,8 @@ if __name__ == "__main__":
                 SETTINGS.current_zoom += 1
 
             save_state()
+            repo.commit()
+
         except Error as e:
             print(e)
 
