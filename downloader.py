@@ -7,6 +7,7 @@ import os
 import sys
 from sqlite3 import Error
 
+import utils
 import db
 
 conn = None
@@ -40,17 +41,12 @@ def save_state():
     print("\t\tState saved")
 
 
-def get_index(x, y, zoom):
-    max_size = 2 ** zoom
-    return y * max_size + x
-
-
 async def save_in_pickle(x, y, zoom):
     if zoom < SETTINGS.current_zoom:
         return
 
     size = 2 ** zoom
-    index = get_index(x, y, zoom)
+    index = utils.get_index(x, y, zoom)
 
     if index < SETTINGS.current_cell:
         return
@@ -101,14 +97,6 @@ async def download_tile(x, y, zoom, percent):
 
 start_time = time.time()
 
-MINUTE = 60 * 60
-HOUR = 60 * MINUTE
-DAY = HOUR * 24
-
-
-def humanized_time(secs):
-    return f"{secs:.2f} sec."
-
 
 async def download_bucket(buckets):
     await asyncio.gather(*[download_tile(*bucket) for bucket in buckets])
@@ -117,7 +105,7 @@ async def download_bucket(buckets):
         return
 
     global start_time
-    buckets.sort(key=lambda bucket: get_index(bucket[0], bucket[1], bucket[2]))
+    buckets.sort(key=lambda bucket: utils.get_index(bucket[0], bucket[1], bucket[2]))
     x, y, zoom, percent = buckets[-1]
     now = time.time()
     total = now - start_time
@@ -128,7 +116,7 @@ async def download_bucket(buckets):
     total_count = (2 ** SETTINGS.current_zoom) ** 2
     elapsed_count = total_count - SETTINGS.current_cell
     elapsed_secs = elapsed_count / speed
-    elapsed_text = humanized_time(elapsed_secs)
+    elapsed_text = utils.humanized_time(elapsed_secs)
     print(f"[{percent:.2f}%]    Downloaded [{zoom}]:{x}x{y}  count:{len(buckets)}  TPS:{speed:.0f}  [{elapsed_text}]")
     start_time = time.time()
 
@@ -177,7 +165,7 @@ def find_start(zoom, start_cell):
 
     for y in range(start_y, max_size):
         for x in range(start_x, max_size):
-            current = get_index(x, y, zoom)
+            current = utils.get_index(x, y, zoom)
             if db.is_tile_exists(conn, x, y, zoom) == False:
                 break
 
