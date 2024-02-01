@@ -181,6 +181,7 @@ async def download_zoom(zoom):
 def find_start(zoom):
     max_size = 2 ** zoom
     current = 0
+    max_index = max_size * max_size - 1
 
     for y in range(max_size):
         for x in range(max_size):
@@ -189,9 +190,10 @@ def find_start(zoom):
             if is_tile_exists(x, y, zoom) == False:
                 SETTINGS.current_cell = index
                 break
-            
+
             sys.stdout.write("\033[F")
-            print("Index:", index)
+            percent = float(index) / max_index * 100.0
+            print(f"Index:{index}/{max_index} [{percent:.2f}]")
 
 
 if __name__ == "__main__":
