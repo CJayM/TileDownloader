@@ -56,6 +56,13 @@ async def save_in_db(x, y, zoom, data):
         cur.execute(sql, task_1)
         conn.commit()
 
+last_save = time.time()
+def save_state():
+    global  last_save
+
+    with open(Settings.FILE_NAME, 'wb') as file:
+        pickle.dump(SETTINGS, file)
+    last_save = time.time()
 
 async def save_in_pickle(x, y, zoom):
     if zoom < SETTINGS.current_zoom:
@@ -84,8 +91,10 @@ async def save_in_pickle(x, y, zoom):
             SETTINGS.current_cell = -1
             SETTINGS.current_zoom += 1
 
-        with open(Settings.FILE_NAME, 'wb') as file:
-            pickle.dump(SETTINGS, file)
+        global last_save
+        delta = time.time() - last_save
+        if delta > 60:
+            save_state()
 
 
 def is_tile_exists(x, y, zoom):
@@ -180,6 +189,7 @@ if __name__ == "__main__":
 
             print("Download at ZOOM", SETTINGS.current_zoom)
             asyncio.run(download_zoom(SETTINGS.current_zoom))
+            save_state()
         except Error as e:
             print(e)
 
