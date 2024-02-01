@@ -204,6 +204,8 @@ if __name__ == "__main__":
             conn.execute('pragma journal_mode=wal')
             create_table(conn, SETTINGS.current_zoom)
 
+            print("Check ZOOM", SETTINGS.current_zoom)
+            print("")
             find_start(SETTINGS.current_zoom)
             size = 2 ** SETTINGS.current_zoom
             max_index = size * size - 1
