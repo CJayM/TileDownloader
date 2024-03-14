@@ -1,2 +1,6 @@
 /.idea/
 World.db3
+*.pyc
+*.pickle
+*.db3
+*.db3-*
