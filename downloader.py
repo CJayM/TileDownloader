@@ -118,6 +118,9 @@ async def download_bucket(buckets):
     elapsed_count = total_count - SETTINGS.current_cell
     elapsed_secs = elapsed_count / speed
     elapsed_text = utils.humanized_time(elapsed_secs)
+
+    percent = float(utils.get_index(x, y, zoom)) / total_count * 100.0
+
     print(f"[{percent:.2f}%]    Downloaded [{zoom}]:{x}x{y}  count:{len(buckets)}  TPS:{speed:.0f}  [{elapsed_text}]")
     start_time = time.time()
 
@@ -136,6 +139,11 @@ async def download_zoom(zoom):
         start_x = SETTINGS.current_cell - start_y * max_size
 
     for y in range(start_y, max_size):
+        print("Check row", y)
+        if repo.is_full_row(y, zoom):
+            start_x = 0
+            continue
+
         for x in range(start_x, max_size):
             current += 1
 
@@ -149,6 +157,7 @@ async def download_zoom(zoom):
             if len(bucket) >= THREAD_COUNTS:
                 await download_bucket(bucket)
                 bucket.clear()
+        start_x = 0
 
     await download_bucket(bucket)
 
@@ -166,20 +175,21 @@ if __name__ == "__main__":
             print("Check ZOOM", SETTINGS.current_zoom)
             print("")
             current = repo.find_start(SETTINGS.current_zoom, SETTINGS.current_cell)
+            # current = 0
             size = 2 ** SETTINGS.current_zoom
             max_index = size * size - 1
-            if current != max_index:
+            if current < max_index:
                 SETTINGS.current_cell = current
                 print("Download at ZOOM", SETTINGS.current_zoom)
                 print("")
                 asyncio.run(download_zoom(SETTINGS.current_zoom))
 
-            if current == max_index:
+            if current >= max_index:
                 SETTINGS.current_cell = -1
                 SETTINGS.current_zoom += 1
 
             save_state()
-            repo.commit()
+            asyncio.run(repo.commit())
 
         except Error as e:
             print(e)

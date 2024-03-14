@@ -2,9 +2,10 @@ import sqlite3
 from sqlite3 import Error
 import asyncio
 
+import db
 import utils
 
-DB_FILE = "tiles.db3"
+DB_FILE = "tiles2.db3"
 
 db_lock = asyncio.Lock()
 
@@ -43,6 +44,16 @@ async def save_in_db(conn, x, y, zoom, data):
         cur.execute(sql, task_1)
 
 
+def is_full_row(conn, y, zoom):
+    sql = f"select count(x) as size, y from z{zoom} where y = {y}  group by y "
+    c = conn.cursor()
+    c.execute(sql)
+    rows = c.fetchall()
+    if not rows:
+        return 0
+    return rows[0][0] == (2 ** zoom)
+
+
 def is_tile_exists(conn, x, y, zoom):
     sql = f"SELECT EXISTS(SELECT 1 FROM z{zoom} WHERE x=\"{x}\" and y=\"{y}\" LIMIT 1);"
     c = conn.cursor()
@@ -71,6 +82,9 @@ class Repository:
     def is_exists(self, x, y, zoom):
         return is_tile_exists(self.conn, x, y, zoom)
 
+    def is_full_row(self, y, zoom):
+        return db.is_full_row(self.conn, y, zoom)
+
     def find_start(self, zoom, start_cell):
         max_size = 2 ** zoom
         current = 0
@@ -83,6 +97,13 @@ class Repository:
             start_x = start_cell - start_y * max_size
 
         for y in range(start_y, max_size):
+            if is_full_row(self.conn, y, zoom):
+                current = utils.get_index(0, y + 1, zoom)
+                continue
+            else:
+                print(f"Row {y} not full")
+                start_x = 0
+
             for x in range(start_x, max_size):
                 current = utils.get_index(x, y, zoom)
                 if is_tile_exists(self.conn, x, y, zoom) == False:

@@ -13,20 +13,21 @@ def humanized_time(secs):
     if secs < (5 * MINUTE):
         return f"{secs:.2f} sec."
     if secs <  HOUR:
-        min = int(secs // MINUTE)
+        mins = int(secs // MINUTE)
         sec = int(secs % MINUTE)
-        return f"00:{min:0d2}:{sec:02d}"
+        txt = "00: {mins:02}:{sec:02}".format(mins=mins,sec=sec)
+        return txt
     if secs < DAY:
         hour = int(secs // HOUR)
         min = int((secs % HOUR) // MINUTE)
         sec = int(secs % MINUTE)
-        return f"{hour:02d}:{min:02d}:{sec:02d}"
+        return "{hour:02}:{min:02}:{sec:02}".format(hour=hour,min=min,sec=sec)
 
     if secs < 7 * DAY:
         days = int(secs // DAY)
         hour = int((secs % DAY) // HOUR)
-        return f"{days} days {hour:02d} hours"
+        return "{days} days {hour:02} hours".format(days=days, hour=hour)
 
     weeks = int (secs // (7*DAY))
     days = int((secs % DAY) // HOUR)
-    return f"{weeks} weeks {days:02d} days"
+    return "{weeks} weeks {days:02} days".format(weeks=weeks, days=days)
