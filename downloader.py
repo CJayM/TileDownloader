@@ -15,7 +15,7 @@ repo = db.Repository()
 pickle_lock = asyncio.Lock()
 
 MAX_ZOOM = 14
-THREAD_COUNTS = 40
+THREAD_COUNTS = 4
 
 
 class Settings:
