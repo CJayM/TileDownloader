@@ -15,7 +15,7 @@ def humanized_time(secs):
     if secs <  HOUR:
         mins = int(secs // MINUTE)
         sec = int(secs % MINUTE)
-        txt = "00: {mins:02}:{sec:02}".format(mins=mins,sec=sec)
+        txt = "{mins:02}:{sec:02}".format(mins=mins,sec=sec)
         return txt
     if secs < DAY:
         hour = int(secs // HOUR)
@@ -29,5 +29,5 @@ def humanized_time(secs):
         return "{days} days {hour:02} hours".format(days=days, hour=hour)
 
     weeks = int (secs // (7*DAY))
-    days = int((secs % DAY) // HOUR)
-    return "{weeks} weeks {days:02} days".format(weeks=weeks, days=days)
+    remaining_days = int((secs % (7*DAY)) // DAY)
+    return "{weeks} weeks {days} days".format(weeks=weeks, days=remaining_days)

@@ -1,4 +1,5 @@
 import time
+import argparse
 
 import asyncio
 import aiohttp
@@ -10,7 +11,13 @@ from sqlite3 import Error
 import utils
 import db
 
-repo = db.Repository()
+# Parse command line arguments
+parser = argparse.ArgumentParser(description='Tile Downloader')
+parser.add_argument('-o', '--output-dir', default='.', help='Output directory for database and settings (default: current directory)')
+args = parser.parse_args()
+
+# Initialize repository with output directory
+repo = db.Repository(args.output_dir)
 
 pickle_lock = asyncio.Lock()
 
@@ -19,15 +26,15 @@ THREAD_COUNTS = 4
 
 
 class Settings:
-    FILE_NAME = "settings.pickle"
-
-    def __init__(self):
+    def __init__(self, output_dir='.'):
+        self.output_dir = output_dir
+        self.FILE_NAME = os.path.join(output_dir, "settings.pickle")
         self.current_zoom = 1
         self.current_cell = -1
         self.buffered_cells = set()
 
 
-SETTINGS = Settings()
+SETTINGS = Settings(args.output_dir)
 
 last_save = time.time()
 
@@ -35,7 +42,7 @@ last_save = time.time()
 def save_state():
     global last_save
 
-    with open(Settings.FILE_NAME, 'wb') as file:
+    with open(SETTINGS.FILE_NAME, 'wb') as file:
         pickle.dump(SETTINGS, file)
     last_save = time.time()
     print("\t\tState saved")
@@ -163,9 +170,13 @@ async def download_zoom(zoom):
 
 
 if __name__ == "__main__":
-    if os.path.exists(Settings.FILE_NAME):
-        with open(Settings.FILE_NAME, 'rb') as file:
-            SETTINGS = pickle.load(file)
+    if os.path.exists(SETTINGS.FILE_NAME):
+        with open(SETTINGS.FILE_NAME, 'rb') as file:
+            loaded_settings = pickle.load(file)
+            # Update the loaded settings with the output directory
+            loaded_settings.output_dir = args.output_dir
+            loaded_settings.FILE_NAME = os.path.join(args.output_dir, "settings.pickle")
+            SETTINGS = loaded_settings
 
     while SETTINGS.current_zoom <= MAX_ZOOM:
         try:
