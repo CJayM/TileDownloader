@@ -1,15 +1,20 @@
 import time
 import argparse
+import sys
+import os
+
+# Add the current directory to the Python path to ensure modules can be found
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 import asyncio
 import aiohttp
 import pickle
-import os
-import sys
 from sqlite3 import Error
 
-import utils
 import db
+import utils
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Tile Downloader')
