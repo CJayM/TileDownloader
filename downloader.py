@@ -19,6 +19,7 @@ import utils
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Tile Downloader')
 parser.add_argument('-o', '--output-dir', default='.', help='Output directory for database and settings (default: current directory)')
+parser.add_argument('--threads', type=int, default=4, help='Number of concurrent download threads (default: 4)')
 args = parser.parse_args()
 
 # Initialize repository with output directory
@@ -27,7 +28,6 @@ repo = db.Repository(args.output_dir)
 pickle_lock = asyncio.Lock()
 
 MAX_ZOOM = 14
-THREAD_COUNTS = 4
 
 
 class Settings:
@@ -166,7 +166,7 @@ async def download_zoom(zoom):
             percent = current / total * 100.0
             bucket.append((x, y, zoom, percent))
 
-            if len(bucket) >= THREAD_COUNTS:
+            if len(bucket) >= args.threads:
                 await download_bucket(bucket)
                 bucket.clear()
         start_x = 0
