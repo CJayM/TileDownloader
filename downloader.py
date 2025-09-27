@@ -151,7 +151,7 @@ async def download_zoom(zoom):
         start_x = SETTINGS.current_cell - start_y * max_size
 
     for y in range(start_y, max_size):
-        print("Check row", y)
+        print(f"Zoom {zoom} - Check row", y)
         if repo.is_full_row(y, zoom):
             start_x = 0
             continue
