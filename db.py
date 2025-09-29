@@ -7,6 +7,9 @@ import os
 import utils
 
 db_lock = asyncio.Lock()
+# Buffer to store records for bulk insert
+buffer = []
+BUFFER_SIZE = 10000
 
 
 def make_connection(output_dir):
@@ -36,12 +39,43 @@ def create_table(conn, zoom):
 
 
 async def save_in_db(conn, x, y, zoom, data):
-    task_1 = (x, y, data, 'png')
-    sql = f'INSERT OR IGNORE INTO z{zoom}(x,y,image, ext) VALUES(?,?,?,?)'
+    # Add record to buffer
+    buffer.append((x, y, data, 'png', zoom))
+    
+    # If buffer is full, perform bulk insert
+    if len(buffer) >= BUFFER_SIZE:
+        await _flush_buffer(conn)
 
+
+async def _flush_buffer(conn):
+    """Flush the buffer by performing a bulk insert of all records"""
+    global buffer
+    
+    if not buffer:
+        return
+
+    print("flush buffer to db")
+        
+    # Group records by zoom level
+    records_by_zoom = {}
+    for x, y, data, ext, zoom in buffer:
+        if zoom not in records_by_zoom:
+            records_by_zoom[zoom] = []
+        records_by_zoom[zoom].append((x, y, data, ext))
+    
     async with db_lock:
         cur = conn.cursor()
-        cur.execute(sql, task_1)
+        for zoom, records in records_by_zoom.items():
+            sql = f'INSERT OR IGNORE INTO z{zoom}(x,y,image, ext) VALUES(?,?,?,?)'
+            cur.executemany(sql, records)
+    
+    # Clear the buffer after flushing
+    buffer = []
+
+
+async def flush_remaining_buffer(conn):
+    """Flush any remaining records in the buffer - should be called at the end of the application"""
+    await _flush_buffer(conn)
 
 
 def is_full_row(conn, y, zoom):
@@ -72,8 +106,14 @@ class Repository:
         self.conn = make_connection(self.output_dir)
 
     async def commit(self):
-        async with db_lock:
+        await self.flush_buffer()
+        
+        async with db_lock:            
             self.conn.commit()
+
+    async def flush_buffer(self):
+        """Flush any remaining records in the buffer"""
+        await _flush_buffer(self.conn)
 
     def create_table(self, zoom):
         create_table(self.conn, zoom)

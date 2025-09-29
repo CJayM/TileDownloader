@@ -38,6 +38,11 @@ class Settings:
         self.current_cell = -1
         self.buffered_cells = set()
 
+    def next_zoom():
+        current_cell = -1
+        current_zoom += 1
+        self.buffered_cells = set()
+
 
 SETTINGS = Settings(args.output_dir)
 
@@ -202,8 +207,7 @@ if __name__ == "__main__":
                 asyncio.run(download_zoom(SETTINGS.current_zoom))
 
             if current >= max_index:
-                SETTINGS.current_cell = -1
-                SETTINGS.current_zoom += 1
+                SETTINGS.next_zoom()                
 
             save_state()
             asyncio.run(repo.commit())
@@ -212,3 +216,6 @@ if __name__ == "__main__":
             print(e)
 
     print("Finished")
+    
+    # Flush any remaining records in the buffer
+    asyncio.run(repo.flush_buffer())
