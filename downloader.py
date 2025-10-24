@@ -38,9 +38,9 @@ class Settings:
         self.current_cell = -1
         self.buffered_cells = set()
 
-    def next_zoom():
-        current_cell = -1
-        current_zoom += 1
+    def next_zoom(self):
+        self.current_cell = -1
+        self.current_zoom += 1
         self.buffered_cells = set()
 
 
