@@ -18,6 +18,7 @@ import utils
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='Tile Downloader')
+parser.add_argument('-z', '--zoom', default=None, help='Zoom level (default: None)')
 parser.add_argument('-o', '--output-dir', default='.', help='Output directory for database and settings (default: current directory)')
 parser.add_argument('--threads', type=int, default=4, help='Number of concurrent download threads (default: 4)')
 args = parser.parse_args()
@@ -187,11 +188,13 @@ if __name__ == "__main__":
             # Update the loaded settings with the output directory
             loaded_settings.output_dir = args.output_dir
             loaded_settings.FILE_NAME = os.path.join(args.output_dir, "settings.pickle")
+            if args.zoom:
+                loaded_settings.current_zoom = int(args.zoom)
             SETTINGS = loaded_settings
 
-    while SETTINGS.current_zoom <= MAX_ZOOM:
+    while int(SETTINGS.current_zoom) <= MAX_ZOOM:
         try:
-            repo.open()
+            repo.open(SETTINGS.current_zoom)
             repo.create_table(SETTINGS.current_zoom)
 
             print("Check ZOOM", SETTINGS.current_zoom)

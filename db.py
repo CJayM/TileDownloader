@@ -12,8 +12,8 @@ buffer = []
 BUFFER_SIZE = 10000
 
 
-def make_connection(output_dir):
-    db_file = os.path.join(output_dir, "tiles.db3")
+def make_connection(zoom: int,output_dir):
+    db_file = os.path.join(output_dir, f"tiles_{zoom}.db3")
     conn = sqlite3.connect(db_file, isolation_level=None)
     conn.execute('pragma journal_mode=wal')
     return conn
@@ -102,8 +102,8 @@ class Repository:
         self.conn = None
         self.output_dir = output_dir
 
-    def open(self):
-        self.conn = make_connection(self.output_dir)
+    def open(self, zoom:int):
+        self.conn = make_connection(zoom, self.output_dir)
 
     async def commit(self):
         await self.flush_buffer()
