@@ -45,9 +45,75 @@ class Settings:
         self.buffered_cells = set()
 
 
+async def clean_buffered_cells(settings, repo):
+    """
+    Проверяет, сохранены ли тайлы из buffered_cells в базе данных,
+    и удаляет их из buffered_cells, если они уже сохранены.
+    Также обновляет current_cell, если есть последовательные тайлы в начале buffered_cells.
+    """
+    if not settings.buffered_cells:
+        return
+
+    total_cells = len(settings.buffered_cells)
+    print(f"Cleaning {total_cells} buffered cells...")
+
+    # Создаем отсортированный список buffered_cells для эффективной обработки
+    sorted_buffered = sorted(settings.buffered_cells)
+
+    # Проверяем, можно ли продвинуть current_cell за счет уже сохраненных тайлов
+    # Начинаем с текущего current_cell и смотрим, есть ли последовательные тайлы в buffered_cells
+    new_current_cell = settings.current_cell
+
+    for i, cell_index in enumerate(sorted_buffered):
+        # Выводим прогресс каждые 100 элементов или если это первый или последний элемент
+        if i == 0 or i % 100 == 0 or i == total_cells - 1:
+            progress_idx = i + 1
+            percent = (progress_idx / total_cells) * 100
+            print(f"Checking index {progress_idx} of {total_cells} ({percent:.2f}%)")
+
+        # Проверяем, существует ли тайл в базе данных
+        size = 2 ** settings.current_zoom
+        y = cell_index // size
+        x = cell_index % size
+
+        if repo.is_exists(x, y, settings.current_zoom):
+            # Если тайл уже существует в базе, удаляем его из buffered_cells
+            settings.buffered_cells.discard(cell_index)
+
+            # Проверяем, можем ли мы продвинуть current_cell
+            # Если cell_index - это следующий ожидаемый индекс, то продвигаем current_cell
+            if cell_index == new_current_cell + 1:
+                new_current_cell = cell_index
+                # Продолжаем проверять, может быть, дальше тоже есть последовательные тайлы
+                while new_current_cell + 1 in settings.buffered_cells:
+                    if repo.is_exists(new_current_cell + 1, 0, settings.current_zoom):  # Проверяем, что тайл реально существует
+                        # Нужно проверить координаты для следующего индекса
+                        next_y = (new_current_cell + 1) // size
+                        next_x = (new_current_cell + 1) % size
+                        if repo.is_exists(next_x, next_y, settings.current_zoom):
+                            settings.buffered_cells.discard(new_current_cell + 1)
+                            new_current_cell += 1
+                        else:
+                            break
+                    else:
+                        break
+
+    # Обновляем current_cell, если удалось продвинуть
+    if new_current_cell > settings.current_cell:
+        settings.current_cell = new_current_cell
+        print(f"Updated current_cell to {new_current_cell}")
+
+    removed_count = total_cells - len(settings.buffered_cells)
+    if removed_count > 0:
+        print(f"Removed {removed_count} already saved tiles from buffered_cells")
+    else:
+        print("No tiles were removed from buffered_cells")
+
+
 SETTINGS = Settings(args.output_dir)
 
 last_save = time.time()
+tiles_processed_since_clean = 0  # Счетчик тайлов с момента последней очистки
 
 
 def save_state():
@@ -75,14 +141,33 @@ async def save_in_pickle(x, y, zoom):
         else:
             SETTINGS.buffered_cells.add(index)
 
-        if SETTINGS.buffered_cells:
-            buffered = list(SETTINGS.buffered_cells)
-            while buffered and buffered[0] == SETTINGS.current_cell + 1:
-                SETTINGS.current_cell += 1
-                del buffered[0]
-                SETTINGS.buffered_cells = set(buffered)
+        # Обновляем current_cell на основе последовательных тайлов в buffered_cells
+        while SETTINGS.current_cell + 1 in SETTINGS.buffered_cells:
+            # Проверяем, что следующий тайл действительно существует в базе данных
+            size = 2 ** SETTINGS.current_zoom
+            next_index = SETTINGS.current_cell + 1
+            next_y = next_index // size
+            next_x = next_index % size
 
-        global last_save
+            if repo.is_exists(next_x, next_y, SETTINGS.current_zoom):
+                SETTINGS.current_cell = next_index
+                SETTINGS.buffered_cells.discard(next_index)  # Удаляем из буфера, так как уже учтён
+            else:
+                break
+
+        global last_save, tiles_processed_since_clean
+        tiles_processed_since_clean += 1
+
+        # Вызываем очистку buffered_cells каждые 10000 тайлов
+        if tiles_processed_since_clean >= 10000:
+            print("Performing periodic clean of buffered cells...")
+            temp_repo = db.Repository(args.output_dir)
+            temp_repo.open(SETTINGS.current_zoom)
+            await clean_buffered_cells(SETTINGS, temp_repo)
+            temp_repo.close()
+            tiles_processed_since_clean = 0  # Сбрасываем счетчик
+            save_state()  # Сохраняем обновленное состояние
+
         delta = time.time() - last_save
         if delta > 60:
             save_state()
@@ -191,6 +276,15 @@ if __name__ == "__main__":
             if args.zoom:
                 loaded_settings.current_zoom = int(args.zoom)
             SETTINGS = loaded_settings
+
+        # Clean buffered cells that may have already been saved to the database
+        temp_repo = db.Repository(args.output_dir)
+        temp_repo.open(SETTINGS.current_zoom)
+        asyncio.run(clean_buffered_cells(SETTINGS, temp_repo))
+        temp_repo.close()  # Закрываем соединение после очистки
+
+        # Сохраняем обновленные настройки после очистки buffered_cells
+        save_state()
 
     while int(SETTINGS.current_zoom) <= MAX_ZOOM:
         try:

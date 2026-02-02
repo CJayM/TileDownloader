@@ -138,7 +138,17 @@ class Repository:
             start_y = start_cell // max_size
             start_x = start_cell - start_y * max_size
 
+        checked_rows = 0
+        total_rows = max_size - start_y
+
         for y in range(start_y, max_size):
+            checked_rows += 1
+
+            # Выводим прогресс каждые 10 строк или если это первая или последняя строка
+            if y == start_y or (y - start_y) % 10 == 9 or y == max_size - 1:
+                percent = (checked_rows / total_rows) * 100
+                print(f"Checking row {y} of {max_size-1} ({percent:.2f}%)")
+
             if self.is_full_row(y, zoom):
                 current = utils.get_index(0, y + 1, zoom)
                 continue
@@ -152,3 +162,9 @@ class Repository:
                     return current
 
         return current
+
+    def close(self):
+        """Закрывает соединение с базой данных"""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
