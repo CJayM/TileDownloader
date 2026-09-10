@@ -4,6 +4,12 @@ def get_index(x, y, zoom):
     return y * size + x
 
 
+def get_xy(index, zoom):
+    """Обратная к get_index: линейный индекс -> (x, y)."""
+    size = 2 ** zoom
+    return index % size, index // size
+
+
 MINUTE = 60
 HOUR = 60 * MINUTE
 DAY = HOUR * 24
