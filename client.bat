@@ -6,5 +6,5 @@ rem  Запуск:  client.bat [дополнительные аргументы]
 rem  Несколько клиентов: запустите несколько окон (каждый под
 rem  своим --client-id) на разных машинах или на одной.
 rem ============================================================
-python client.py --server http://127.0.0.1:8080 --client-id %COMPUTERNAME% --threads 16 %*
+python client.py --server http://127.0.0.1:8765 --client-id %COMPUTERNAME% --threads 16 %*
 pause

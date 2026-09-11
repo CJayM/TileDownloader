@@ -3,6 +3,7 @@
 #  Tile Downloader — сервер
 #  Мастер-БД тайлов + jobs.db3 + HTTP API + HTML-дашборд.
 #  Запуск:  ./server.sh [дополнительные аргументы]
-#  Дашборд: http://localhost:8080/dashboard
+#  Дашборд: http://localhost:8765/dashboard
+#  Порт 8765: на этой машине 8080/8081 на 127.0.0.1 заняты adb-сервером.
 # ============================================================
-python3 server.py -o ./master --host 0.0.0.0 --port 8080 --min-zoom 1 --max-zoom 14 "$@"
+python3 server.py -o ./master --host 0.0.0.0 --port 8765 --min-zoom 1 --max-zoom 14 "$@"
