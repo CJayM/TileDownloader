@@ -71,6 +71,7 @@ class JobManager:
     # ------------------------------------------------------------------ open
 
     def open(self):
+        os.makedirs(self.config.output_dir, exist_ok=True)
         path = os.path.join(self.config.output_dir, 'jobs.db3')
         self.jobs_conn = sqlite3.connect(path, isolation_level=None)
         self.jobs_conn.execute('pragma journal_mode=wal')

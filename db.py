@@ -10,6 +10,7 @@ BUFFER_SIZE = 10000
 
 
 def make_connection(zoom: int, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
     db_file = os.path.join(output_dir, f"tiles_{zoom}.db3")
     conn = sqlite3.connect(db_file, isolation_level=None)
     conn.execute('pragma journal_mode=wal')
