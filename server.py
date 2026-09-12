@@ -122,7 +122,10 @@ def create_app(config, manager, lock=None,
         except asyncio.CancelledError:
             pass
 
-    app = web.Application()
+    # client_max_size по умолчанию у aiohttp — 1 МиБ, и любой submit больше
+    # (пачка тайлов) отклонялся им самим 413 text/plain до нашего обработчика.
+    # Растягиваем до max_request_bytes, чтобы приложение само решало лимит.
+    app = web.Application(client_max_size=max_request_bytes)
     app.router.add_get('/healthz', healthz)
     app.router.add_get('/api/task', api_task)
     app.router.add_post('/api/tasks/{task_id}/submit', api_submit)

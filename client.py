@@ -47,11 +47,23 @@ class ServerAPI:
             await self._session.close()
             self._session = None
 
+    @staticmethod
+    async def _read_json(resp):
+        """JSON-ответ; при не-JSON (413 aiohttp, страница ошибки) — словарик
+        ошибки, а не исключение: долгий клиент не должен падать с трейсбека,
+        а просто счесть задачу несданной и получить её заново."""
+        try:
+            return await resp.json(content_type=None)
+        except (aiohttp.client_exceptions.ContentTypeError, ValueError):
+            text = (await resp.text())[:200]
+            return {'ok': False, 'error': f'HTTP {resp.status}: {text}',
+                    'status': 'error'}
+
     async def get_task(self):
         session = await self._ensure()
         url = f'{self.server_url}/api/task?client_id={self.client_id}'
         async with session.get(url) as resp:
-            return await resp.json()
+            return await self._read_json(resp)
 
     async def submit(self, task_id, zoom, tiles):
         """tiles: список (x, y, ext, data). Кодирует фрейм и отправляет."""
@@ -59,13 +71,13 @@ class ServerAPI:
         session = await self._ensure()
         url = f'{self.server_url}/api/tasks/{task_id}/submit?client_id={self.client_id}'
         async with session.post(url, data=body) as resp:
-            return await resp.json()
+            return await self._read_json(resp)
 
     async def heartbeat(self, task_id):
         session = await self._ensure()
         url = f'{self.server_url}/api/tasks/{task_id}/heartbeat?client_id={self.client_id}'
         async with session.post(url) as resp:
-            return await resp.json()
+            return await self._read_json(resp)
 
 
 async def download_range(fetcher, zoom, start, end, threads, put_cb,

@@ -116,6 +116,25 @@ def test_submit_too_large_413(run_server):
     run_server(body, min_zoom=1, max_zoom=1, chunk_size=4, max_request_bytes=10)
 
 
+def test_submit_larger_than_default_client_max_size(run_server):
+    """Body > 1MiB (дефолт client_max_size у aiohttp), но < max_request_bytes,
+    должен дойти до обработчика (200), а не быть отклонён самим aiohttp (413)."""
+    async def body(client, mgr, clock):
+        task = (await (await client.get('/api/task?client_id=c1')).json())['task']
+        zoom = task['zoom']
+        tiles = []
+        for i in range(task['start_idx'], task['end_idx']):
+            x, y = utils.get_xy(i, zoom)
+            tiles.append((x, y, b'png', b'A' * 600_000))   # ~1.2MiB на 2 тайла
+        frame = protocol.encode_submit(zoom, tiles)
+        assert len(frame) > 1_048_576
+        resp = await client.post(
+            f"/api/tasks/{task['task_id']}/submit?client_id=c1", data=frame)
+        assert resp.status == 200
+        assert (await resp.json())['status'] == 'submitted'
+    run_server(body, min_zoom=1, max_zoom=1, chunk_size=2)
+
+
 def test_submit_requires_client_id(run_server):
     async def body(client, mgr, clock):
         task = (await (await client.get('/api/task?client_id=c1')).json())['task']
