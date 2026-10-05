@@ -4,7 +4,18 @@
 (см. jobs.py), реальных ожиданий и внешних запросов в тестах нет.
 """
 
+import os
+import sys
+
 import pytest
+
+# Модули разнесены по независимым проектам server/ и client/.
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+for _sub in ('server', 'client'):
+    _path = os.path.join(_ROOT, _sub)
+    if _path not in sys.path:
+        sys.path.insert(0, _path)
 
 import db
 import jobs

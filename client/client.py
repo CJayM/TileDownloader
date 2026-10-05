@@ -193,7 +193,7 @@ async def run(api, buf, fetcher, threads=16, heartbeat_interval=300,
 
 def main():
     parser = argparse.ArgumentParser(description='Tile Downloader client')
-    parser.add_argument('--server', default='http://127.0.0.1:8080')
+    parser.add_argument('--server', default='http://127.0.0.1:31059')
     parser.add_argument('--client-id', default=socket.gethostname())
     parser.add_argument('--buffer-dir', default='./buffer')
     parser.add_argument('--threads', type=int, default=16)

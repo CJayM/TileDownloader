@@ -142,7 +142,7 @@ def main():
     parser = argparse.ArgumentParser(description='Tile Downloader server')
     parser.add_argument('-o', '--output-dir', default='.', help='Каталог мастер-БД и jobs.db3')
     parser.add_argument('--host', default='0.0.0.0')
-    parser.add_argument('--port', type=int, default=8080)
+    parser.add_argument('--port', type=int, default=31059)
     parser.add_argument('--min-zoom', type=int, default=1)
     parser.add_argument('--max-zoom', type=int, default=14)
     parser.add_argument('-z', '--zoom', type=int, default=None, help='Скачивать только зум N')

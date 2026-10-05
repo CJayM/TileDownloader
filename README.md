@@ -43,20 +43,20 @@ pip install aiohttp
 
 ```bash
 # Windows
-server.bat
+server\server.bat
 # Linux/macOS
-./server.sh
+./server/server.sh
 ```
 
-По умолчанию сервер слушает `0.0.0.0:8080`, каталог мастер-БД — `./master`,
-зум-диапазон `1..14`. Дашборд: <http://localhost:8080/dashboard>.
+По умолчанию сервер слушает `0.0.0.0:31059`, каталог мастер-БД — `./master`,
+зум-диапазон `1..14`. Дашборд: <http://localhost:31059/dashboard>.
 
 Полный список аргументов — `python server.py --help`:
 
 | Аргумент | Описание | По умолчанию |
 |----------|----------|--------------|
 | `-o, --output-dir` | Каталог мастер-БД и `jobs.db3` | `.` |
-| `--host` / `--port` | Адрес и порт HTTP | `0.0.0.0` / `8080` |
+| `--host` / `--port` | Адрес и порт HTTP | `0.0.0.0` / `31059` |
 | `--min-zoom` / `--max-zoom` | Диапазон зумов | `1` / `14` |
 | `-z, --zoom` | Скачивать только зум N | — |
 | `--chunk-size` | Размер задачи (тайлов) | `2000` |
@@ -67,9 +67,9 @@ server.bat
 
 ```bash
 # Windows
-client.bat
+client\client.bat --server http://<host>:31059
 # Linux/macOS
-./client.sh
+./client/client.sh --server http://<host>:31059
 ```
 
 Каждый клиент: получает задачу (`GET /api/task`), скачивает свой диапазон тайлов
@@ -80,7 +80,7 @@ client.bat
 
 | Аргумент | Описание | По умолчанию |
 |----------|----------|--------------|
-| `--server` | URL сервера | `http://127.0.0.1:8080` |
+| `--server` | URL сервера | `http://127.0.0.1:31059` |
 | `--client-id` | Идентификатор клиента | имя хоста |
 | `--buffer-dir` | Каталог локального буфера | `./buffer` |
 | `--threads` | Потоков на скачивание | `16` |
@@ -108,16 +108,26 @@ client.bat
 
 ## Структура проекта
 
-- `server.py` — HTTP-сервер (aiohttp) + запуск TTL-рипера
-- `client.py` — клиент-рабочий: загрузка диапазона, буфер, сабмит, heartbeat
-- `jobs.py` — ядро: выдача задач, учёт in-flight, TTL, статистика (без сети)
-- `buffer.py` — локальный SQLite-буфер клиента
-- `db.py` — доступ к мастер-БД (`Repository`)
-- `protocol.py` — бинарный формат фрейма сабмита
-- `dashboard.py` — HTML-дашборд (инлайн-стили/JS)
-- `utils.py` — индексация тайлов и форматирование
-- `reduce.py` — поиск дублей в мастер-БД
-- `server.bat`/`client.bat`, `server.sh`/`client.sh` — скрипты запуска
+Проект разделён на два независимых подпроекта; каждый самодостаточен и
+разворачивается отдельно (нужен только `aiohttp`).
+
+- **`server/`** — сервер заданий:
+  - `server.py` — HTTP-сервер (aiohttp) + TTL-рипер
+  - `jobs.py` — ядро: выдача задач, учёт in-flight, TTL, статистика
+  - `db.py` — доступ к мастер-БД (`Repository`)
+  - `dashboard.py` — HTML-дашборд (инлайн-стили/JS)
+  - `protocol.py`, `utils.py` — общие модули (своя копия)
+  - `server.bat` / `server.sh`, `install.bat`, `requirements.txt`
+- **`client/`** — клиент-рабочий:
+  - `client.py` — загрузка диапазона, буфер, сабмит, heartbeat
+  - `buffer.py` — локальный SQLite-буфер
+  - `protocol.py`, `utils.py` — общие модули (своя копия)
+  - `client.bat` / `client.sh`, `install.bat`, `requirements.txt`
+- **`tests/`** — общие тесты (импортируют модули из `server/` и `client/`)
+- `reduce.py` — поиск дублей в мастер-БД; `migrate.py` — миграция legacy `tiles.db3`
+
+> `protocol.py` и `utils.py` намеренно продублированы в обоих проектах —
+> при изменении правьте обе копии (либо держите их синхронными).
 
 ## Хранение данных
 
