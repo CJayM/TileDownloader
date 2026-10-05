@@ -116,6 +116,7 @@ client\client.bat --server http://<host>:31059
   - `jobs.py` — ядро: выдача задач, учёт in-flight, TTL, статистика
   - `db.py` — доступ к мастер-БД (`Repository`)
   - `dashboard.py` — HTML-дашборд (инлайн-стили/JS)
+  - `migrate.py` — миграция legacy `tiles.db3` в per-zoom базы
   - `protocol.py`, `utils.py` — общие модули (своя копия)
   - `server.bat` / `server.sh`, `install.bat`, `requirements.txt`
 - **`client/`** — клиент-рабочий:
@@ -124,7 +125,7 @@ client\client.bat --server http://<host>:31059
   - `protocol.py`, `utils.py` — общие модули (своя копия)
   - `client.bat` / `client.sh`, `install.bat`, `requirements.txt`
 - **`tests/`** — общие тесты (импортируют модули из `server/` и `client/`)
-- `reduce.py` — поиск дублей в мастер-БД; `migrate.py` — миграция legacy `tiles.db3`
+- `reduce.py` — поиск дублей в мастер-БД (автономный инструмент, остаётся в корне)
 
 > `protocol.py` и `utils.py` намеренно продублированы в обоих проектах —
 > при изменении правьте обе копии (либо держите их синхронными).
