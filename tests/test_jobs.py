@@ -247,6 +247,40 @@ def test_client_activity_window(make_manager, clock):
     assert st2['global']['active_clients'] == 0
 
 
+def test_client_states(make_manager, clock):
+    m = make_manager(min_zoom=1, max_zoom=1, chunk_size=4)
+    m.issue('A')                 # A забирает все 4 тайла -> работает
+    m.issue('B')                 # свободных нет -> B ждёт задание
+    states = {c['client_id']: c['state'] for c in m.status()['clients']}
+    assert states['A'] == 'working'
+    assert states['B'] == 'waiting'
+
+    # пока принимается сабмит -> «отдаёт результат»
+    m.set_submitting('B', True)
+    states = {c['client_id']: c['state'] for c in m.status()['clients']}
+    assert states['B'] == 'submitting'
+    m.set_submitting('B', False)
+
+    # молчание дольше idle_window -> неактивен (у A задача всё ещё выдана)
+    clock.advance(1000)
+    states = {c['client_id']: c['state'] for c in m.status()['clients']}
+    assert states['A'] == 'working'
+    assert states['B'] == 'offline'
+
+
+def test_status_client_counts(make_manager):
+    m = make_manager(min_zoom=1, max_zoom=1, chunk_size=4)
+    m.issue('A')
+    m.issue('B')
+    g = m.status()['global']
+    assert g['clients_total'] == 2
+    assert g['clients_working'] == 1
+    assert g['clients_waiting'] == 1
+    assert g['clients_submitting'] == 0
+    assert g['total_tiles'] == 4
+    assert g['percent'] == 0.0
+
+
 def test_events_limit(make_manager):
     m = make_manager(min_zoom=1, max_zoom=1, chunk_size=4)
     task, _ = m.issue('c1')

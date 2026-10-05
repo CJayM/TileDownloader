@@ -37,6 +37,10 @@ HTML = """<!DOCTYPE html>
   .events .ts { color:var(--muted); margin-right:8px; }
   .events .kind { display:inline-block; min-width:92px; color:var(--bar); }
   .tag-done { color:var(--done); font-size:11px; margin-left:6px; }
+  .st-wait { color:#eab308; }
+  .st-work { color:var(--bar); }
+  .st-submit { color:#a855f7; }
+  .st-off { color:var(--muted); }
 </style>
 </head>
 <body>
@@ -45,9 +49,10 @@ HTML = """<!DOCTYPE html>
   <div class="sub" id="updated">загрузка…</div>
   <div class="cards">
     <div class="card"><div class="label">Активный зум</div><div class="value" id="active-zoom">–</div></div>
-    <div class="card"><div class="label">Готово</div><div class="value" id="done">–</div></div>
+    <div class="card"><div class="label">Готовность</div><div class="value" id="percent">–</div></div>
     <div class="card"><div class="label">Скорость (tiles/s)</div><div class="value" id="rate">–</div></div>
-    <div class="card"><div class="label">Активных клиентов</div><div class="value" id="clients">–</div></div>
+    <div class="card"><div class="label">Клиенты (актив/всего)</div><div class="value" id="clients">–</div></div>
+    <div class="card"><div class="label">Статусы клиентов</div><div class="value" id="client-states" style="font-size:14px;font-weight:500">–</div></div>
     <div class="card"><div class="label">Скачано всего</div><div class="value" id="total">–</div></div>
   </div>
   <section>
@@ -57,7 +62,7 @@ HTML = """<!DOCTYPE html>
   <section>
     <h2>Клиенты</h2>
     <table id="clients-table">
-      <thead><tr><th>ID</th><th>Задач</th><th>Last seen</th><th>Сдано</th><th>tiles/s</th></tr></thead>
+      <thead><tr><th>ID</th><th>Статус</th><th>Задач</th><th>Last seen</th><th>Сдано</th><th>tiles/s</th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
@@ -67,16 +72,21 @@ HTML = """<!DOCTYPE html>
   </section>
 </div>
 <script>
+const STATE_LABEL = { 'waiting':'ждёт задание', 'working':'отрабатывает задание', 'submitting':'отдаёт результат', 'offline':'неактивен' };
+const STATE_CLASS = { 'waiting':'st-wait', 'working':'st-work', 'submitting':'st-submit', 'offline':'st-off' };
 function fmtTime(ts){ try{ return new Date(ts*1000).toLocaleTimeString(); }catch(e){ return ts; } }
 function fmtN(n){ return Number(n).toLocaleString('ru-RU'); }
 async function refresh(){
   try {
     const st = await (await fetch('/api/status?window=300')).json();
     const ev = await (await fetch('/api/events?limit=50')).json();
-    document.getElementById('active-zoom').textContent = (st.active_zoom == null ? '–' : st.active_zoom);
-    document.getElementById('done').textContent = st.done ? 'да' : 'нет';
+    document.getElementById('active-zoom').textContent = (st.active_zoom == null ? '–' : ('z' + st.active_zoom));
+    document.getElementById('percent').textContent = st.global.percent.toFixed(2) + '%' + (st.done ? ' ✓' : '');
     document.getElementById('rate').textContent = st.global.rate_tps.toFixed(1);
-    document.getElementById('clients').textContent = st.global.active_clients;
+    document.getElementById('clients').textContent = st.global.active_clients + ' / ' + st.global.clients_total;
+    document.getElementById('client-states').textContent =
+      'ждёт ' + st.global.clients_waiting + ' · работ. ' + st.global.clients_working +
+      ' · отдаёт ' + st.global.clients_submitting;
     document.getElementById('total').textContent = fmtN(st.global.downloaded_tiles);
     document.getElementById('updated').textContent = 'обновлено ' + new Date().toLocaleTimeString();
     const zooms = document.getElementById('zooms');
@@ -96,7 +106,8 @@ async function refresh(){
     tb.innerHTML = '';
     for (const c of st.clients) {
       const tr = document.createElement('tr');
-      tr.innerHTML = '<td>' + c.client_id + '</td><td>' + c.active_tasks + '</td><td>' +
+      tr.innerHTML = '<td>' + c.client_id + '</td><td class="' + (STATE_CLASS[c.state] || '') + '">' +
+        (STATE_LABEL[c.state] || c.state) + '</td><td>' + c.active_tasks + '</td><td>' +
         fmtTime(c.last_seen) + '</td><td>' + fmtN(c.submitted_tiles) + '</td><td>' + c.rate_tps.toFixed(1) + '</td>';
       tb.appendChild(tr);
     }

@@ -6,6 +6,8 @@
 #  Дашборд:  http://localhost:31059/dashboard
 #  Зависимости: pip install -r requirements.txt
 #  Порт 31059 выбран случайно, чтобы не пересекаться с adb и др.
+#  Каталог мастер-БД: по умолчанию ./master. Продолжить существующую
+#  базу:  ./server.sh -o /path/to/tiles_out
 # ============================================================
 cd "$(dirname "$0")" || exit 1
 python3 server.py -o ./master --host 0.0.0.0 --port 31059 --min-zoom 1 --max-zoom 14 "$@"

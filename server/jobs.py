@@ -30,6 +30,7 @@ class ServerConfig:
     chunk_size: int = 2000      # размер задачи в тайлах
     task_ttl: int = 900         # время жизни задачи без heartbeat, c
     reap_interval: int = 15     # период TTL-рипера, c
+    idle_window: int = 15       # c: молчание дольше — клиент считается неактивным
 
 
 @dataclass
@@ -67,6 +68,7 @@ class JobManager:
         self.meta = {}                     # кэш meta в памяти
         self.tasks = {}                    # id -> TileTask
         self.clients = {}                  # client_id -> {last_seen, submitted_tiles}
+        self.submitting = set()            # client_id, чей сабмит сейчас принимается
 
     # ------------------------------------------------------------------ open
 
@@ -215,8 +217,19 @@ class JobManager:
     def issue(self, client_id):
         """Выдать задачу клиенту. Возвращает (TileTask|None, done)."""
         now = self.clock()
+        # Регистрируем клиента на каждом запросе — так видно и «ждущих».
+        self._touch_client(client_id, now)
         self._reset_client_tasks(client_id, now)
         return self._issue_next(client_id, now)
+
+    def set_submitting(self, client_id, flag):
+        """Пометка «клиент отдаёт результат» на время приёма сабмита."""
+        now = self.clock()
+        self._touch_client(client_id, now)
+        if flag:
+            self.submitting.add(client_id)
+        else:
+            self.submitting.discard(client_id)
 
     def _issue_next(self, client_id, now):
         zoom = self._activate_zoom(now)
@@ -460,6 +473,7 @@ class JobManager:
         for cid, info in self.clients.items():
             clients.append({
                 'client_id': cid,
+                'state': self._client_state(cid, now),
                 'active_tasks': self._client_active_tasks(cid),
                 'last_seen': info['last_seen'],
                 'submitted_tiles': info['submitted_tiles'],
@@ -467,6 +481,12 @@ class JobManager:
             })
         active_clients = sum(1 for c in clients
                              if self._client_is_active(c['client_id'], now, window_sec))
+
+        total_expected = sum(zz['total'] for zz in zooms)
+        total_percent = (total_downloaded / total_expected * 100.0) if total_expected else 100.0
+        by_state = {}
+        for c in clients:
+            by_state[c['state']] = by_state.get(c['state'], 0) + 1
 
         return {
             'done': all(zz['done'] for zz in zooms),
@@ -476,7 +496,14 @@ class JobManager:
             'clients': clients,
             'global': {
                 'downloaded_tiles': total_downloaded,
+                'total_tiles': total_expected,
+                'percent': round(total_percent, 2),
                 'active_clients': active_clients,
+                'clients_total': len(clients),
+                'clients_waiting': by_state.get('waiting', 0),
+                'clients_working': by_state.get('working', 0),
+                'clients_submitting': by_state.get('submitting', 0),
+                'clients_offline': by_state.get('offline', 0),
                 'rate_tps': self._global_rate(now, window_sec),
             },
         }
@@ -508,6 +535,17 @@ class JobManager:
         if cid not in self.clients:
             self.clients[cid] = {'last_seen': now, 'submitted_tiles': 0}
         self.clients[cid]['submitted_tiles'] += saved
+
+    def _client_state(self, cid, now):
+        """Состояние клиента: submitting | working | waiting | offline."""
+        if cid in self.submitting:
+            return 'submitting'
+        if self._client_active_tasks(cid) > 0:
+            return 'working'
+        info = self.clients.get(cid)
+        if info and (now - info['last_seen']) <= self.config.idle_window:
+            return 'waiting'
+        return 'offline'
 
     def _client_is_active(self, cid, now, window_sec):
         if self._client_active_tasks(cid) > 0:

@@ -66,16 +66,22 @@ def create_app(config, manager, lock=None,
         if not client_id:
             return web.json_response({'ok': False, 'error': 'client_id required'}, status=400)
         task_id = int(request.match_info['task_id'])
-        body = await request.read()
-        if len(body) > max_request_bytes:
-            return web.json_response({'ok': False, 'error': 'request too large'}, status=413)
+        # Пока читается тело, клиент фактически «отдаёт результат» — отмечаем это,
+        # чтобы дашборд показывал uploading, а не «выполняет задачу».
+        await _with_lock(manager.set_submitting, client_id, True)
         try:
-            zoom, tiles = protocol.decode_submit(
-                body, max_tiles=config.chunk_size, max_request_bytes=max_request_bytes)
-        except protocol.ProtocolError as e:
-            return web.json_response({'ok': False, 'error': f'invalid frame: {e}'}, status=400)
-        tiles = [(x, y, ext.decode('ascii', 'replace'), data) for (x, y, ext, data) in tiles]
-        res = await _with_lock(manager.submit, client_id, task_id, tiles)
+            body = await request.read()
+            if len(body) > max_request_bytes:
+                return web.json_response({'ok': False, 'error': 'request too large'}, status=413)
+            try:
+                zoom, tiles = protocol.decode_submit(
+                    body, max_tiles=config.chunk_size, max_request_bytes=max_request_bytes)
+            except protocol.ProtocolError as e:
+                return web.json_response({'ok': False, 'error': f'invalid frame: {e}'}, status=400)
+            tiles = [(x, y, ext.decode('ascii', 'replace'), data) for (x, y, ext, data) in tiles]
+            res = await _with_lock(manager.submit, client_id, task_id, tiles)
+        finally:
+            await _with_lock(manager.set_submitting, client_id, False)
         return web.json_response({
             'ok': True,
             'status': res.status,
@@ -149,12 +155,14 @@ def main():
     parser.add_argument('--chunk-size', type=int, default=2000)
     parser.add_argument('--task-ttl', type=int, default=900)
     parser.add_argument('--reap-interval', type=int, default=15)
+    parser.add_argument('--idle-window', type=int, default=15,
+                        help='c: молчание клиента дольше — он считается неактивным')
     args = parser.parse_args()
 
     config = jobs.ServerConfig(
         output_dir=args.output_dir, min_zoom=args.min_zoom, max_zoom=args.max_zoom,
         zoom=args.zoom, chunk_size=args.chunk_size, task_ttl=args.task_ttl,
-        reap_interval=args.reap_interval)
+        reap_interval=args.reap_interval, idle_window=args.idle_window)
     manager = jobs.JobManager(config)
     manager.open()
     app = create_app(config, manager)
